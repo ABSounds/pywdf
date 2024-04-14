@@ -5,6 +5,7 @@ from .rtype import RTypeAdaptor
 from scipy.io import wavfile
 import scipy.signal
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from scipy.fftpack import fft
 
 
@@ -119,11 +120,16 @@ class Circuit:
         H = fft(x, fft_size)[:N2]
         return H
 
-    def plot_freqz(self, outpath: str = None, fft_size: int = None):
+    def plot_freqz(self, outpath: str = None, fft_size: int = None, xlim = [20, 20_000], xticks = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000], ylim: [int, int] = None, ystep: int = None, linewidth = 2):
         """Plot the circuit's frequency response
 
         Args:
             outpath (str, optional): filepath to save figure. Defaults to None.
+            fft_size (int, optional): number of points of the FFT. Defaults to 2^15.
+            xlim ([int, int], optional): [x_min, x_max], x axis limits for the plot. Defaults to [20, 20_000].
+            ylim ([int, int], optional): [y_min, y_max], y axis limits for the plot. Defaults to [None, None].
+            ystep (int, optional): space between the y axis marks. Defaults to None.
+            linewidth (int, optional): width of the plot lines in pixels. Defaults to 2.
         """
         if fft_size is None:
             fft_size = int(2**15)
@@ -131,39 +137,52 @@ class Circuit:
         nyquist = self.fs / 2
         magnitude = 20 * np.log10(np.abs(H) + np.finfo(float).eps)
         phase = np.angle(H)
-        magnitude_peak = np.max(magnitude)
-        top_offset = 10
-        bottom_offset = 70
         N2 = int(fft_size / 2 - 1)
         frequencies = np.linspace(0, nyquist, N2)
 
         # TODO: improve frequency axis
-        _, ax = plt.subplots(nrows=2, ncols=1, figsize=(10, 6.5))
+        plt.rc('lines', linewidth = linewidth)
+        ax = []
+        # TODO: find a better y_size. This one's a bit chonky
+        fig, ax1 = plt.subplots(ncols = 1, nrows=1, figsize = (10, 5))
+        ax.append(ax1)
         xlims = [10**0, 10 ** np.log10(self.fs / 2)]
-        ax[0].semilogx(frequencies, magnitude, label="WDF")
+        ax[0].semilogx(frequencies, magnitude, color = "C00", linestyle = '-', label="Magnitude [dB]")
         ax[0].set_xlim(xlims)
-        ax[0].set_ylim([magnitude_peak - bottom_offset, magnitude_peak + top_offset])
+        if ylim is None:
+            #TODO: add variable offset (??)
+            ymin = int(min(magnitude) - 2.0)
+            ymax = int(max(magnitude) + 2.0)
+            ylim = [ymin, ymax]
+        ax[0].set_ylim(ylim)
         ax[0].set_xlabel("Frequency [Hz]")
         ax[0].set_ylabel("Magnitude [dBFs]")
-        ax[0].grid()
+        ax[0].grid(True, which = 'both')
+        if ystep is None:
+            ystep = np.ceil((ylim[1] - ylim[0]) / 10)
+        ax[0].set_yticks (np.arange(ymin, ymax + ystep, step = ystep))
+        ax.append(ax[0].twinx())
+        
+        phase = 180 * phase / np.pi
+        ax[1].semilogx(frequencies, phase, color = "C01", linestyle = '--', label = "Phase [degrees]")
+        ax[1].set_ylim([-180, 180])
+        ax[1].set_yticks(np.arange(-180, 180, 30))
+        ax[1].set_ylabel("Phase [degrees]")
+        ax[1].xaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
+        ax[1].xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{:0g}'.format(x)))
+        ax[1].set_xticks(xticks)
+
         ax[0].set_title(
-            loc="left", label=self.__class__.__name__ + " magnitude response"
+            loc="left", label=self.__class__.__name__
         )
 
-        phase = 180 * phase / np.pi
-        ax[1].semilogx(frequencies, phase, color="tab:orange")
-        ax[1].set_xlim(xlims)
-        ax[1].set_ylim([-180, 180])
-        ax[1].set_xlabel("Frequency [Hz]")
-        ax[1].set_ylabel("Phase [degrees]")
-        ax[1].grid()
-        ax[1].set_title(loc="left", label=self.__class__.__name__ + " phase response")
-
+        #TODO: I don't like the position of the legend using fig.legend() but ax.legend() overlaps the two axes legends
+        fig.legend()
         plt.tight_layout()
         if outpath:
             plt.savefig(outpath)
         plt.show()
-
+        
     def plot_freqz_list(
         self,
         values: list,
