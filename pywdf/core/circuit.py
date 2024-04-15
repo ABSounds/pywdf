@@ -7,6 +7,7 @@ import scipy.signal
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from scipy.fftpack import fft
+import time
 
 
 class Circuit:
@@ -298,6 +299,34 @@ class Circuit:
             plt.savefig(outpath)
 
         plt.show()
+    
+    def measure_performance(self, t, n):
+        """Measure performance of the circuit by processing n times a signal of length t seconds at self.fs sample rate.
+
+        Args:
+            t (float): time in seconds of the signal to process
+            n (int): number of executions to average
+        
+        Returns:
+            (float, float): (mean time taken to process t seconds of audio, real-time ratio)
+        """
+        times = []
+        inputSignal = np.random.rand(int(t * self.fs))
+
+        print(f'Time to process {t} seconds of audio with {self.__class__.__name__} at {self.fs / 1000:.0f} kHz:')
+        for i in range(n):
+            startTime = time.monotonic()
+            self.process_signal(inputSignal)
+            endTime = time.monotonic()
+            totalTime = endTime - startTime
+            times.append(totalTime)
+            if (n != 1):
+                print(f'  - Run {i+1} took {totalTime:.4}s')
+        mean = np.mean(times)
+        rt_ratio = t / mean
+        print(f'\nAverage time taken to process {t} seconds of audio at {self.fs / 1000:.0f} kHz: {mean:.4}s')
+        print(f'Average real-time ratio: {rt_ratio:.4}')
+        return (mean, rt_ratio)
 
     def _impedance_calc(self, R: RTypeAdaptor):
         """Placeholder function used to calculate impedance of Rtype adaptor
