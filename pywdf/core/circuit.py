@@ -371,7 +371,6 @@ class Circuit:
         LTspice_magnitude = np.array(LTspice_magnitude)
 
         H = self.compute_spectrum(fft_size=int((len(LTspice_magnitude) + 2) * 2 + 1))[1:]
-        nyquist = self.fs / 2
         pywdf_magnitude = 20 * np.log10(np.abs(H) + np.finfo(float).eps)
 
         linear_pywdf_mag = np.abs(H)
@@ -383,8 +382,8 @@ class Circuit:
 
         ax = fig.add_subplot(111)
 
-        ax.semilogx(frequencies, LTspice_magnitude, linestyle = '-', color = 'C0', label=r"$|H_{LTSpice}(f)|$[dB]")
-        ax.semilogx(frequencies, pywdf_magnitude, linestyle = '--', color = 'C1', label=r"$|H_{pywdf}(f)|$[dB]")
+        ax.semilogx(frequencies, LTspice_magnitude, linestyle = '-', color = 'C0', label=r"$|H_{LTSpice}(f)|$")
+        ax.semilogx(frequencies, pywdf_magnitude, linestyle = '--', color = 'C1', label=r"$|H_{pywdf}(f)|$")
         ax.legend()
         ax.set_title(f'Magnitude response error at {int(self.fs/1000)} kHz sample rate')
         ax.grid(True, which='both')
@@ -414,9 +413,8 @@ class Circuit:
 
         # TODO: Add variable range for the error. Sampling frequency dependant? User input??
         # Add text annotation for error
-        # TODO: IS THIS ALWAYS 4096 OR WAS THIS HARDCODED?
         # How do we want to measure the error?? 0 to fs/2? 20Hz-20kHz? :4096 is right for 20 to 24kHz
-        error_rms_20_24 = np.sqrt(np.mean(error[:4096]))
+        error_rms_20_24 = np.sqrt(np.mean(error[:int(n/2)]))
         # The one below is probably the best one, calculates the error between 0 and fs/2
         error_rms = np.sqrt(np.mean(error))
         latex_error_rms = r"${Error_{RMS}}|_{0 - 24 kHz}$" + f' = {error_rms_20_24:.2e}'
