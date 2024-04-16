@@ -391,11 +391,12 @@ class Circuit:
         ax.set_ylabel("Magnitude [dB]")
         # TODO: Maybe it's interesting to allow the user to choose the x_limits but we're working with audio here so maybe 20-20kHz makes sense.
         ax.set_xlim(20, 20_000)
-        ax.set_ylim(int(min(LTspice_magnitude) - 2.0), int(max(LTspice_magnitude) + 2.0))  # Fit y-axis to magnitude graphs
+        ax.set_ylim(int(2.0 * np.round(np.min(LTspice_magnitude - 2.0) / 2.0)), int(2.0 * np.round(np.max(LTspice_magnitude + 2.0) / 2.0)) )  # Fit y-axis to magnitude graphs
 
         # Set the x-axis tick formatter
         ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
         ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{:0g}'.format(x)))
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(2))
         # TODO: Should we fix the x_ticks?? I like that formatting but maybe doesn't work very well for some use cases.
         ax.set_xticks([20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000])
 
