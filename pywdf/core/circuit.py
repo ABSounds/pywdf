@@ -365,11 +365,10 @@ class Circuit:
         pywdf_magnitude_dB = 20 * np.log10(pywdf_magnitude_linear + np.finfo(float).eps)
         error = (10 ** (LTspice_magnitude_dB / 20) - pywdf_magnitude_linear)**2
 
-        fig = plt.figure(figsize=(10, 4))
+        _, ax = plt.subplots(figsize=(10, 4))
         plt.rc('lines', linewidth = 3)
-        ax = fig.add_subplot(111)
-        ax.semilogx(frequencies, LTspice_magnitude_dB, linestyle = '-', color = 'C0', label=r"$|H_{LTSpice}(f)|$")
-        ax.semilogx(frequencies, pywdf_magnitude_dB, linestyle = '--', color = 'C1', label=r"$|H_{pywdf}(f)|$")
+        ax.semilogx(frequencies, LTspice_magnitude_dB, linestyle='-', color='C0', label=r"$|H_{LTSpice}(f)|$")
+        ax.semilogx(frequencies, pywdf_magnitude_dB, linestyle='--', color='C1', label=r"$|H_{pywdf}(f)|$")
         ax.legend()
         ax.set_title(f'Magnitude response error at {int(self.fs/1000)} kHz sample rate')
         ax.set_xlabel("Frequency [Hz]")
@@ -377,21 +376,20 @@ class Circuit:
         ax.set_xlim(20, 20_000)
         ylim = (int(2.0 * np.round(np.min(LTspice_magnitude_dB - 2.0) / 2.0)), int(2.0 * np.round(np.max(LTspice_magnitude_dB + 2.0) / 2.0)))
         ax.set_ylim(ylim[0], ylim[1])
-        ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
         ax.yaxis.set_major_locator(ticker.MultipleLocator(2))
+        ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
         ax.set_xticks([20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000])
-        ax.xaxis.grid(True, which='both')
-        ax.yaxis.grid(True, which='both')
         error_matrix = np.tile(error, (3, 1))
         Y = np.linspace(ylim[0], ylim[1], num=3)
         norm = colors.LogNorm(vmin=1e-8, vmax=1e-3)
-        pcm = ax.pcolormesh(frequencies, Y, error_matrix, cmap = 'binary', norm = norm)
-        del error_matrix
+        pcm = ax.pcolormesh(frequencies, Y, error_matrix, cmap='binary', norm=norm)
+        del error_matrix, Y
         cbar = plt.colorbar(pcm, ax=ax)
         cbar.set_label(r"$(|H_{\mathrm{LTSpice}}(f)| - |H_{\mathrm{pywdf}}(f)|)^2$")
         error_rms = np.sqrt(np.mean(error))
         latex_error_rms = r"${Error_{RMS}}|_{0 - fs/2}$" + f' = {error_rms:.3e}'
         ax.text(0.05, 0.1, latex_error_rms, bbox=dict(boxstyle='round', fc='w', ec='gray', alpha=0.7), transform=ax.transAxes)
+        ax.grid(True, which='both')
         plt.tight_layout()
         plt.show()
 
