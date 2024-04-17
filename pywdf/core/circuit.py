@@ -383,7 +383,6 @@ class Circuit:
         Y = np.linspace(ylim[0], ylim[1], num=3)
         norm = colors.LogNorm(vmin=1e-8, vmax=1e-3)
         pcm = ax.pcolormesh(frequencies, Y, error_matrix, cmap='binary', norm=norm)
-        del error_matrix, Y
         cbar = plt.colorbar(pcm, ax=ax)
         cbar.set_label(r"$(|H_{\mathrm{LTSpice}}(f)| - |H_{\mathrm{pywdf}}(f)|)^2$")
         error_rms = np.sqrt(np.mean(error))
