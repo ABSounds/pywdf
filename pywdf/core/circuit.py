@@ -329,7 +329,7 @@ class Circuit:
         print(f'Average real-time ratio: {rt_ratio:.4}')
         return (mean, rt_ratio)
     
-    def compare_with_LTSpice(self, file_path, fs: float, n = 16384) -> None:
+    def compare_with_LTspice(self, file_path, fs: float, n = 16384) -> None:
         """Plot the error between the WDF model and data exported from LTspice simulations
 
         You can export the data from LTspice by:
@@ -341,88 +341,57 @@ class Circuit:
             3. Make sure that the exporting format is set to Polar: (dB,deg) and you have selected the output voltage of the circuit
 
         Args:
-            file_path (): path to the .txt file exported from LTspice
+            file_path (string): path to the .txt file exported from LTspice
             fs (float): sample rate used to export the data
-            n (int): number of points exported. Defaults to 16384
+            n (int, optional): number of points exported. Defaults to 16384
         """
         
         frequencies = []
-        LTspice_magnitude = []
-
-        # This doesn't belong here
-        plt.rc('lines', linewidth = 3)
-        
+        LTspice_magnitude_dB = []
         with open(file_path, 'r', encoding='latin-1') as file:
-            # Skip the header line
             next(file)
-            # Read each line
             for line in file:
-                # Split the line by tab and whitespace
                 values = line.strip().split('\t')
-                # Extract frequency and magnitude values
                 frequency = float(values[0])
                 magnitude = float(values[1].split('(')[1].split('dB')[0])
-
-                # Append values to arrays
                 frequencies.append(frequency)
-                LTspice_magnitude.append(magnitude)
+                LTspice_magnitude_dB.append(magnitude)
+            frequencies = np.array(frequencies)
+            LTspice_magnitude_dB = np.array(LTspice_magnitude_dB)
 
-        frequencies = np.array(frequencies)
-        LTspice_magnitude = np.array(LTspice_magnitude)
-
-        H = self.compute_spectrum(fft_size=int((len(LTspice_magnitude) + 2) * 2 + 1))[1:]
-        pywdf_magnitude = 20 * np.log10(np.abs(H) + np.finfo(float).eps)
-
-        linear_pywdf_mag = np.abs(H)
-        del(H)
-        linear_LTSpice_mag = 10 ** (LTspice_magnitude / 20)
-        error = (linear_LTSpice_mag - linear_pywdf_mag)**2
+        self.set_sample_rate(fs)
+        self.reset()
+        pywdf_magnitude_linear = np.abs(self.compute_spectrum(fft_size=int((len(LTspice_magnitude_dB) + 2) * 2 + 1))[1:])
+        pywdf_magnitude_dB = 20 * np.log10(pywdf_magnitude_linear + np.finfo(float).eps)
+        error = (10 ** (LTspice_magnitude_dB / 20) - pywdf_magnitude_linear)**2
 
         fig = plt.figure(figsize=(10, 4))
-
+        plt.rc('lines', linewidth = 3)
         ax = fig.add_subplot(111)
-
-        ax.semilogx(frequencies, LTspice_magnitude, linestyle = '-', color = 'C0', label=r"$|H_{LTSpice}(f)|$")
-        ax.semilogx(frequencies, pywdf_magnitude, linestyle = '--', color = 'C1', label=r"$|H_{pywdf}(f)|$")
+        ax.semilogx(frequencies, LTspice_magnitude_dB, linestyle = '-', color = 'C0', label=r"$|H_{LTSpice}(f)|$")
+        ax.semilogx(frequencies, pywdf_magnitude_dB, linestyle = '--', color = 'C1', label=r"$|H_{pywdf}(f)|$")
         ax.legend()
         ax.set_title(f'Magnitude response error at {int(self.fs/1000)} kHz sample rate')
-        ax.grid(True, which='both')
         ax.set_xlabel("Frequency [Hz]")
         ax.set_ylabel("Magnitude [dB]")
-        # TODO: Maybe it's interesting to allow the user to choose the x_limits but we're working with audio here so maybe 20-20kHz makes sense.
         ax.set_xlim(20, 20_000)
-        ax.set_ylim(int(2.0 * np.round(np.min(LTspice_magnitude - 2.0) / 2.0)), int(2.0 * np.round(np.max(LTspice_magnitude + 2.0) / 2.0)) )  # Fit y-axis to magnitude graphs
-
-        # Set the x-axis tick formatter
+        ylim = (int(2.0 * np.round(np.min(LTspice_magnitude_dB - 2.0) / 2.0)), int(2.0 * np.round(np.max(LTspice_magnitude_dB + 2.0) / 2.0)))
+        ax.set_ylim(ylim[0], ylim[1])
         ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
-        ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{:0g}'.format(x)))
         ax.yaxis.set_major_locator(ticker.MultipleLocator(2))
-        # TODO: Should we fix the x_ticks?? I like that formatting but maybe doesn't work very well for some use cases.
         ax.set_xticks([20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000])
-
+        ax.xaxis.grid(True, which='both')
+        ax.yaxis.grid(True, which='both')
         error_matrix = np.tile(error, (3, 1))
-
-        Y = np.linspace(-20, 20, num=3)
-
-        #TODO: How are we setting vmin and vmax so that it always shows a meaningful range? User input?? 
+        Y = np.linspace(ylim[0], ylim[1], num=3)
         norm = colors.LogNorm(vmin=1e-8, vmax=1e-3)
         pcm = ax.pcolormesh(frequencies, Y, error_matrix, cmap = 'binary', norm = norm)
-
-        # Create colorbar
+        del error_matrix
         cbar = plt.colorbar(pcm, ax=ax)
         cbar.set_label(r"$(|H_{\mathrm{LTSpice}}(f)| - |H_{\mathrm{pywdf}}(f)|)^2$")
-
-        # TODO: Add variable range for the error. Sampling frequency dependant? User input??
-        # Add text annotation for error
-        # How do we want to measure the error?? 0 to fs/2? 20Hz-20kHz? :4096 is right for 20 to 24kHz
-        error_rms_20_24 = np.sqrt(np.mean(error[:int(n/2)]))
-        # The one below is probably the best one, calculates the error between 0 and fs/2
         error_rms = np.sqrt(np.mean(error))
-        latex_error_rms = r"${Error_{RMS}}|_{0 - 24 kHz}$" + f' = {error_rms_20_24:.2e}'
+        latex_error_rms = r"${Error_{RMS}}|_{0 - fs/2}$" + f' = {error_rms:.3e}'
         ax.text(0.05, 0.1, latex_error_rms, bbox=dict(boxstyle='round', fc='w', ec='gray', alpha=0.7), transform=ax.transAxes)
-
-        ### FIX AXIS: Step 2 and limits multiples of 2
-
         plt.tight_layout()
         plt.show()
 
